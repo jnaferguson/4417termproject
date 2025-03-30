@@ -1,0 +1,345 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title> Dashboard</title>
+	<link rel="stylesheet" href="css/styles.css">
+
+</head>
+
+<body>
+<header class="top-bar">
+	<h1>Welcome, <span id="userName">User</span></h1>
+	<div class="search-container">
+		<label for="searchInput"></label><input type="text" id="searchInput" placeholder="Search..."/>
+	</div>
+</header>
+
+<nav class="sidebar">
+	<button id="logoutBtn">Log Out</button>
+	<button id="submitFeedbackBtn" style="display:none;">Submit Feedback</button>
+	<button id="viewFeedbackBtn" style="display:none;">View Feedback</button>
+	<button id="viewUsersBtn" style="display:none;">View Users</button>
+	<button id="deleteAUserBtn" style="display:none;">Remove A User</button>
+	<button id="dashboardBtn">Dashboard</button>
+</nav>
+
+<main class="dashboard">
+	<h2> Main Dashboard Page</h2>
+	<div class="image-container">
+		<img src="images/garfield.jpg" alt="Main Page Graphic"/>
+	</div>
+</main>
+
+<div id="modalSubmitFeedback" class="modal">
+	<div class="modal-content">
+		<button class="close-btn" id="closeSubmitModal">&times;</button>
+		<h2> Submit Feedback</h2>
+		<label for="feedbackText"></label><textarea id="feedbackText" rows="9" style="width:100%;" maxlength="=500" oninput="updateCharacterCount()"></textarea>
+		<p id="charCount">0/500</p>
+		<button id="submitBtn" style="margin-top:10px;">Submit</button>
+	</div>
+</div>
+<div id="deleteUserForm" class="modal">
+	<div class="delete-user-box">
+		<button class="close-btn" id="closeSubmitModal3">&times;</button>
+		<h2>Delete User</h2>
+		<label>
+			<input type="text" id="userID" placeholder="Enter The Users ID" class="input-box">
+		</label>
+		<button class="reset-btn" id="deleteBtn"> Remove User</button>
+	</div>
+</div>
+
+<div id="modalViewFeedback" class="modal">
+	<div class="modal-content">
+		<button class="close-btn" id="closeViewModal">&times;</button>
+		<h2> All Feedback</h2>
+		<div id="feedbackItems"></div>
+	</div>
+</div>
+<div id="modalViewUsers" class="modal">
+	<div class="modal-content">
+		<button class="close-btn" id="closeViewModal2">&times;</button>
+		<h2> All Users</h2>
+		<div id="userItems"></div>
+	</div>
+</div>
+
+
+<script>
+	let userEmail="";
+	let sessionExpired=false;
+	function checkSession(){
+	fetch("/check-session", {method: "GET", credentials: "include"})
+		.then(response =>{
+			if(!response.ok){
+				throw new Error("Session Expired, Please log in again");
+			}
+			return response.json();
+		})
+		.then(data =>{
+			sessionExpired=false;
+			buttonsToDisable.forEach(button =>button.disabled=false);
+		})
+		.catch(error =>{
+			alert(data.message);
+			buttonsToDisable.forEach(button =>button.disabled=true);
+			window.location.href="/mainPage.html";
+		});
+	}
+
+	function updateCharacterCount(){
+		const feedbackText= document.getElementById("feedbackText");
+		const charCount= document.getElementById("charCount");
+		charCount.textContent=`${feedbackText.value.length} /500`;
+
+		if(feedbackText.value.length>500){
+			feedbackText.value=feedbackText.value.substring(0,500);
+		}
+	}
+
+    document.addEventListener("DOMContentLoaded",function(){
+        const logoutBtn= document.getElementById("logoutBtn");
+        const dashboardBtn= document.getElementById("dashboardBtn");
+        const deleteAUserBtn= document.getElementById("deleteAUserBtn");
+        const submitFeedbackBtn= document.getElementById("submitFeedbackBtn");
+        const viewFeedbackBtn= document.getElementById("viewFeedbackBtn");
+        const viewUsersBtn= document.getElementById("viewUsersBtn");
+
+        const modalSubmitFeedback= document.getElementById("modalSubmitFeedback");
+        const modalViewFeedback= document.getElementById("modalViewFeedback");
+        const modalViewUsers= document.getElementById("modalViewUsers");
+
+        const closeSubmitModal= document.getElementById("closeSubmitModal");
+        const closeViewModal= document.getElementById("closeViewModal");
+        const closeViewModal2= document.getElementById("closeViewModal2");
+
+        const feedbackText= document.getElementById("feedbackText");
+        const submitBtn= document.getElementById("submitBtn");
+        const feedbackItems= document.getElementById("feedbackItems");
+        const userItems= document.getElementById("userItems");
+
+        const userNameElem= document.getElementById("userName");
+        const searchInput= document.getElementById("searchInput");
+
+        const deleteUserForm=document.getElementById("deleteUserForm");
+        const deleteBtn=document.getElementById("deleteBtn");
+        const closeViewModal3= document.getElementById("closeViewModal3");
+
+        const buttonsToDisable= [logoutBtn,dashboardBtn,deleteAUserBtn,submitFeedbackBtn,viewFeedbackBtn,viewUsersBtn];
+		checkSession();
+		const sessionInterval=setInterval(checkSession,60000);
+
+        // get user role and username from backend
+        fetch("/get-user-role", {method: "GET",credentials:"include"})
+            .then((response) =>response.json())
+            .then((data) =>{
+                if(!data || !data.role || !data.email){
+                    window.location.href="/mainPage.html";
+                    alert("Not logged in. Redirecting to log in page");
+                    return;
+                }
+                const{ role, username,email}=data;
+                userNameElem.textContent=username;
+                userEmail=email;
+                // admin sees logout, view feedback and dashboard
+                if(role ==="admin"){
+                    submitFeedbackBtn.style.display="none"
+                    viewFeedbackBtn.style.display="block"
+                    viewUsersBtn.style.display="block"
+                    deleteAUserBtn.style.display="block"
+
+
+                }else{
+                    // user sees logout, submit feedback and dashboard
+                    submitFeedbackBtn.style.display="block"
+                    viewFeedbackBtn.style.display="none"
+                }
+            })
+            .catch((error)=>{
+                console.error("Error fetching user role:",error);
+                alert("Session error, Please log in again");
+                window.location.href="/mainPage.html";
+            });
+        // logout button
+        logoutBtn.addEventListener("click",function(){
+            fetch("/logout",{method:"POST"})
+                .then(()=>{
+                    window.location.href="/mainPage.html";
+                })
+                .catch((error)=>{
+                    console.error("Logout Failed:",error);
+                });
+        });
+        // dashboard button
+        dashboardBtn.addEventListener("click",function(){
+            window.location.href="/dashboard";
+        });
+        // Submit feedback (user only)
+        submitFeedbackBtn.addEventListener("click",function(){
+            modalSubmitFeedback.style.display="block";
+        });
+
+        // close the submit feedback modal
+        closeSubmitModal.addEventListener("click",function(){
+            modalSubmitFeedback.style.display="none";
+        });
+
+        // feedback submitted to backend
+        submitBtn.addEventListener("click",function(){
+            const message=feedbackText.value.trim();
+            if(!message){
+                alert("Please enter feedback");
+                return;
+            }
+            if(message.length>500){
+            	alert("Feedback cannot exceed 500 characters");
+            	return;
+            }
+
+            // if users email is displayed in user userNameElem
+            const username=userNameElem.textContent;
+            if(!userEmail){
+                alert("Error, no email found. Please log in again");
+                return;
+            }
+            fetch("/submit-feedback",{
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body: JSON.stringify({
+                    username:username,
+                    message: message,
+                    email: userEmail,
+                    timestamp: new Date().toISOString()
+                })
+            })
+                .then((res)=>res.json())
+                .then((data)=>{
+                    if(data.error){
+                        alert(data.error);
+                    }else if(data.success){
+                        alert(data.message);
+                        feedbackText.value="";
+                        charCount.textContent="0/500";
+                        modalSubmitFeedback.style.display="none";
+                    }else{
+                        // handle other responses
+                        alert("Feedback submitted!");
+                        feedbackText.value="";
+                        charCount.textContent="0/500";
+                        modalSubmitFeedback.style.display="none";
+                    }
+                })
+                .catch((err)=>{
+                    console.error("Error submitting feedback:",err);
+                });
+        });
+
+        viewFeedbackBtn.addEventListener("click",function(){
+            modalViewFeedback.style.display="block";
+            fetch("/view-feedback",{method: "GET"})
+                .then((res)=>{
+                    if(!res.ok) throw new Error("Unauthorized or not admin");
+                    return res.json();
+                })
+                .then((feedbackList)=>{
+                    feedbackItems.innerHTML="";
+                    feedbackList.forEach((item)=>{
+                        const div=document.createElement("div");
+                        div.classList.add("feedback-item");
+                        div.textContent=`Username: ${item.user.username}- Message: ${item.message}`;
+                        feedbackItems.appendChild(div);
+                    });
+                })
+                .catch((error)=>{
+                    console.error("Error fetching feedback:",error);
+                    alert("You are not authorized or an error has occurred");
+                    modalViewFeedback.style.display="none";
+                });
+        });
+
+        // close view feedback modal
+        closeViewModal.addEventListener("click",function(){
+            modalViewFeedback.style.display="none";
+        });
+
+        viewUsersBtn.addEventListener("click",function(){
+            modalViewUsers.style.display="block";	//show admin feedback
+            fetch("/view-users",{method: "GET"})
+                .then((res)=>{
+                    if(!res.ok) throw new Error("Unauthorized or not admin");
+                    return res.json();
+                })
+                .then((userList)=>{
+                    userItems.innerHTML="";
+                    userList.forEach((item)=>{
+                        const div=document.createElement("div");
+                        div.classList.add("user-item");
+                        div.textContent=`User: ${item.username}- Email: ${item.email}-Role: ${item.role}`;
+                        userItems.appendChild(div);
+                    });
+                })
+                .catch((error)=>{
+                    console.error("Error fetching users:",error);
+                    alert("You are not authorized or an error has occurred");
+                    modalViewUsers.style.display="none";
+                });
+        });
+
+        // close view feedback modal
+        closeViewModal2.addEventListener("click",function(){
+            modalViewUsers.style.display="none";
+        });
+
+        // delete User Button functionality
+
+        deleteAUserBtn.addEventListener("click", function(event) {
+            event.preventDefault();
+            deleteUserForm.style.display="block";
+        })
+        deleteBtn.addEventListener("click",function(event){
+            event.preventDefault();
+            const userID = document.getElementById("userID").value.trim();
+
+            if (userID == "") {
+                alert("Please enter the users ID.");
+                return;
+            }
+            fetch('/delete-user', {
+                method: 'POST',
+                headers: {
+                   'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: userID })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("User has been deleted successfully.");
+                    document.getElementById("userID").value="";
+                    deleteUserForm.style.display = "none";
+                } else {
+                    alert(`Error deleting user ${data.message || "Please try again."}`);
+                    document.getElementById("userID").value="";
+
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                alert("Something went wrong deleting user, please try again later.");
+            });
+        });
+        closeSubmitModal3.addEventListener("click",function(event){
+            event.preventDefault();
+            deleteUserForm.style.display="none";
+        });
+    });
+</script>
+</body>
+</html>
+
+
